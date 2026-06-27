@@ -1,8 +1,4 @@
-node_modules
-dist
+.agents/
 .env
-.env.*
-!.env.example
-npm-debug.log
-.DS_Store
-*.local
+node_modules/
+dist/
