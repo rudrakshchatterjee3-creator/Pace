@@ -1,7 +1,4 @@
-// src/lib/geminiClient.ts
-// Typed, demo-proof wrapper around the SERVER-SIDE /api/agent proxy.
-// The browser never holds the API key. Always returns a usable result:
-// live model output when possible, your mock fallback when not.
+import { UserProfile } from "./history";
 
 export interface AgentRequest<TIn> {
   /** A short id for the task, e.g. "triage", "plan", "extract". */
@@ -15,7 +12,10 @@ export interface AgentRequest<TIn> {
   schemaHint: string;
   /** Optional extra system guidance for this specific call. */
   system?: string;
+  /** User profile to customize AI suggestions */
+  profile?: UserProfile;
 }
+
 
 export interface AgentOptions<TOut> {
   /** Deterministic fallback so the live demo NEVER shows an error state. */
@@ -55,10 +55,22 @@ export async function callAgent<TIn, TOut>(
 
   for (let attempt = 0; attempt <= retries; attempt++) {
     try {
+      const { profile, ...restReq } = req;
+      const bodyPayload = {
+        ...restReq,
+        profile: profile ? {
+          name: profile.name,
+          age: profile.age,
+          exam: profile.targetExam,
+          avatar: profile.avatar,
+        } : undefined,
+        heavy: !!opts.heavy
+      };
+
       const res = await fetch("/api/agent", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ ...req, heavy: !!opts.heavy }),
+        body: JSON.stringify(bodyPayload),
         signal: opts.signal,
       });
 
