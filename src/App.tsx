@@ -1,6 +1,8 @@
 import { useState } from "react";
-import { Sparkles, Loader2, AlertCircle, Phone, BookOpen, Activity } from "lucide-react";
+import { Sparkles, Loader2, AlertCircle, Phone, BookOpen, Activity, LogOut } from "lucide-react";
 import { callAgent } from "./lib/geminiClient";
+import { GoogleLogin, googleLogout, CredentialResponse } from '@react-oauth/google';
+import { jwtDecode } from "jwt-decode";
 
 interface PaceIn {
   journalEntry: string;
@@ -33,6 +35,23 @@ export default function App() {
   const [result, setResult] = useState<PaceOut | null>(null);
   const [source, setSource] = useState<"live" | "mock" | null>(null);
   const [error, setError] = useState<string | null>(null);
+  
+  // Auth state
+  const [user, setUser] = useState<any>(null);
+
+  const handleLoginSuccess = (credentialResponse: CredentialResponse) => {
+    if (credentialResponse.credential) {
+      const decoded = jwtDecode(credentialResponse.credential);
+      setUser(decoded);
+    }
+  };
+
+  const handleLogout = () => {
+    googleLogout();
+    setUser(null);
+    setResult(null);
+    setEntry("");
+  };
 
   async function run(input: PaceIn, forceCrisisDemo = false) {
     setLoading(true);
@@ -49,8 +68,6 @@ export default function App() {
         { mock: () => forceCrisisDemo ? CRISIS_FALLBACK : DEMO_FALLBACK }
       );
       
-      // Safety override: if the entry itself contains obvious test keywords for crisis,
-      // force is_crisis in case the model failed to flag it (belt and suspenders for the hackathon).
       const text = input.journalEntry.toLowerCase();
       if (text.includes("want to end it") || text.includes("hurt myself")) {
         data.is_crisis = true;
@@ -65,125 +82,184 @@ export default function App() {
     }
   }
 
+  // --- LANDING PAGE ---
+  if (!user) {
+    return (
+      <main className="relative flex min-h-screen flex-col items-center justify-center bg-paper px-6 font-body overflow-hidden">
+        {/* Background Shader / Gradients */}
+        <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-accent-calm/20 via-paper to-paper pointer-events-none"></div>
+        <div className="absolute -top-32 -left-32 w-96 h-96 bg-accent-warm/20 rounded-full blur-3xl opacity-50 mix-blend-multiply pointer-events-none animate-pulse"></div>
+        <div className="absolute top-1/2 -right-32 w-96 h-96 bg-accent-calm/20 rounded-full blur-3xl opacity-50 mix-blend-multiply pointer-events-none"></div>
+
+        <div className="relative z-10 w-full max-w-md text-center space-y-12 animate-in fade-in slide-in-from-bottom-8 duration-1000">
+          <div className="space-y-6">
+            <div className="mx-auto h-24 w-24 bg-ink rounded-full flex items-center justify-center shadow-2xl ring-8 ring-ink/5">
+              <Sparkles className="h-12 w-12 text-paper" />
+            </div>
+            <div>
+              <h1 className="font-display text-5xl md:text-6xl font-bold tracking-tight text-ink mb-4">
+                Welcome to Pace
+              </h1>
+              <p className="text-xl text-ink/70 font-medium max-w-sm mx-auto leading-relaxed">
+                Your digital companion for the exam marathon.
+              </p>
+            </div>
+          </div>
+
+          <div className="rounded-[2rem] border border-white/40 bg-white/60 p-10 shadow-xl backdrop-blur-xl transition-all hover:bg-white/70">
+            <h2 className="font-display text-2xl font-bold text-ink mb-8">Start Your Journey</h2>
+            <div className="flex justify-center">
+              <GoogleLogin
+                onSuccess={handleLoginSuccess}
+                onError={() => console.log('Login Failed')}
+                useOneTap
+                theme="filled_black"
+                shape="pill"
+                size="large"
+                text="continue_with"
+              />
+            </div>
+            <p className="text-sm text-muted mt-8 font-medium">
+              Pace is a safe space. Your entries are processed securely and never shared.
+            </p>
+          </div>
+        </div>
+      </main>
+    );
+  }
+
+  // --- DAILY DEBRIEF UI (LOGGED IN) ---
   return (
-    <main className="mx-auto flex min-h-screen max-w-2xl flex-col px-6 py-12 font-body">
+    <main className="mx-auto flex min-h-screen max-w-2xl flex-col px-6 py-8 md:py-12 font-body relative">
       {/* Signature Element: Breath Bar */}
-      <div className="h-1 w-full rounded-full bg-accent-calm/30 mb-12 overflow-hidden relative">
-        <div className="absolute inset-y-0 left-0 bg-accent-calm animate-breath rounded-full w-full"></div>
+      <div className="absolute top-0 left-0 w-full h-1.5 bg-accent-calm/20 overflow-hidden">
+        <div className="h-full bg-accent-calm animate-breath rounded-r-full"></div>
       </div>
 
-      <header className="space-y-3 mb-10">
-        <h1 className="font-display text-4xl font-semibold tracking-tight text-ink">
-          Pace
-        </h1>
-        <p className="text-xl text-ink/80 font-medium">
-          How did today's prep go? Unpack it here.
-        </p>
-        <p className="text-muted leading-relaxed">
-          Exam prep is a marathon. Drop your thoughts, stress, or burnout below. 
-          We'll help you find your footing before the next study session.
-        </p>
+      <header className="flex items-start justify-between mb-12 mt-4 animate-in fade-in slide-in-from-top-4 duration-700">
+        <div className="space-y-3">
+          <h1 className="font-display text-4xl font-bold tracking-tight text-ink">
+            Pace
+          </h1>
+          <p className="text-xl text-ink/80 font-medium">
+            Hey {user.given_name || 'there'}, how did today's prep go?
+          </p>
+          <p className="text-muted leading-relaxed max-w-md">
+            Exam prep is a marathon. Drop your thoughts, stress, or burnout below. 
+            We'll help you find your footing before the next study session.
+          </p>
+        </div>
+        <button 
+          onClick={handleLogout}
+          className="p-2.5 text-muted hover:bg-muted/10 rounded-full transition-colors group"
+          aria-label="Log out"
+        >
+          <LogOut className="h-5 w-5 group-hover:text-ink transition-colors" />
+        </button>
       </header>
 
-      <div className="flex flex-col gap-4">
-        <label htmlFor="journal" className="sr-only">Your journal entry</label>
+      <div className="flex flex-col gap-4 animate-in fade-in slide-in-from-bottom-4 duration-700 delay-150 fill-mode-both">
+        <label htmlFor="journal" className="sr-only">Daily Debrief Entry</label>
         <textarea
           id="journal"
           value={entry}
           onChange={(e) => setEntry(e.target.value)}
           placeholder="I'm feeling overwhelmed after today's mock test..."
-          className="min-h-[160px] w-full resize-y rounded-xl border border-muted/30 bg-white p-5 text-ink outline-none focus-visible:border-accent-calm focus-visible:ring-2 focus-visible:ring-accent-calm/20 transition-all shadow-sm"
+          className="min-h-[180px] w-full resize-y rounded-2xl border-2 border-transparent bg-white p-6 text-lg text-ink shadow-sm placeholder:text-muted/50 focus:border-accent-calm focus:outline-none focus:ring-4 focus:ring-accent-calm/10 transition-all"
         />
         
         <div className="flex flex-wrap gap-3 items-center mt-2">
           <button
             onClick={() => run({ journalEntry: entry })}
             disabled={loading || !entry.trim()}
-            className="inline-flex items-center justify-center gap-2 rounded-lg bg-ink px-6 py-3 font-medium text-paper disabled:opacity-50 transition-colors hover:bg-ink/90 active:scale-[0.98]"
+            className="inline-flex items-center justify-center gap-2 rounded-xl bg-ink px-8 py-3.5 font-semibold text-paper disabled:opacity-50 transition-all hover:bg-ink/90 hover:shadow-lg active:scale-[0.98] shadow-md"
           >
-            {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
+            {loading ? <Loader2 className="h-5 w-5 animate-spin" /> : <Sparkles className="h-5 w-5" />}
             Reflect
           </button>
           <div className="flex-1"></div>
           <button
             onClick={() => run({ journalEntry: entry || "sample" })}
-            className="rounded-lg border border-muted/30 px-4 py-2.5 text-sm font-medium text-muted transition-colors hover:bg-muted/5 hover:text-ink"
+            className="rounded-xl border border-muted/20 bg-white px-5 py-3 font-medium text-muted transition-all hover:bg-paper hover:text-ink hover:border-muted/40"
           >
             Load Demo
           </button>
           <button
             onClick={() => run({ journalEntry: "I can't take this anymore, I want to end it" }, true)}
-            className="rounded-lg border border-red-200 bg-red-50 px-4 py-2.5 text-sm font-medium text-red-700 transition-colors hover:bg-red-100"
+            className="rounded-xl border border-red-200 bg-red-50 px-5 py-3 font-medium text-red-700 transition-all hover:bg-red-100 hover:border-red-300"
           >
             Test Crisis
           </button>
         </div>
       </div>
 
-      <div className="mt-8">
+      <div className="mt-10">
         {error && (
-          <div className="flex items-start gap-3 rounded-xl border border-crisis/30 bg-crisis/10 p-5 text-sm text-ink" role="alert">
-            <AlertCircle className="mt-0.5 h-5 w-5 shrink-0 text-crisis" />
-            <span className="leading-relaxed">{error}</span>
+          <div className="flex items-start gap-4 rounded-2xl border border-crisis/30 bg-crisis/5 p-6 text-ink shadow-sm animate-in fade-in" role="alert">
+            <AlertCircle className="mt-0.5 h-6 w-6 shrink-0 text-crisis" />
+            <span className="leading-relaxed text-lg">{error}</span>
           </div>
         )}
 
         {result && (
-          <div className="animate-in fade-in slide-in-from-bottom-4 duration-500 ease-out mt-4" aria-live="polite">
+          <div className="animate-in fade-in slide-in-from-bottom-8 duration-700 ease-out mt-4" aria-live="polite">
             
             {result.is_crisis ? (
-              // CRISIS OVERRIDE PATH
-              <div className="space-y-4 rounded-2xl border-2 border-crisis bg-white p-6 shadow-md">
-                <div className="flex items-center gap-3 text-crisis mb-2">
-                  <AlertCircle className="h-6 w-6" />
-                  <h2 className="font-display text-2xl font-bold tracking-tight">You don't have to carry this alone.</h2>
+              /* --- CRISIS SUPPORT UI --- */
+              <div className="space-y-6 rounded-[2rem] border-2 border-crisis bg-white p-8 shadow-xl relative overflow-hidden">
+                <div className="absolute top-0 left-0 w-full h-2 bg-crisis"></div>
+                <div className="flex items-center gap-4 text-crisis mb-4">
+                  <AlertCircle className="h-8 w-8" />
+                  <h2 className="font-display text-3xl font-bold tracking-tight">You don't have to carry this alone.</h2>
                 </div>
-                <p className="text-ink/90 text-lg leading-relaxed">
+                <p className="text-ink text-xl leading-relaxed font-medium">
                   It sounds like you are going through an incredibly difficult time right now. 
-                  Please reach out to someone who can support you.
+                  Please reach out to someone who can support you immediately.
                 </p>
-                <div className="bg-paper rounded-xl p-5 mt-4 space-y-4 border border-muted/20">
-                  <div className="flex items-start gap-4">
-                    <div className="bg-crisis/10 p-3 rounded-full text-crisis mt-1">
-                      <Phone className="h-5 w-5" />
+                <div className="bg-crisis/5 rounded-2xl p-6 mt-6 space-y-6 border border-crisis/10">
+                  <div className="flex items-center gap-5 p-2">
+                    <div className="bg-crisis/10 p-4 rounded-full text-crisis">
+                      <Phone className="h-6 w-6" />
                     </div>
                     <div>
                       <p className="font-semibold text-ink text-lg">KIRAN Mental Health Helpline</p>
-                      <p className="text-2xl font-display font-bold text-crisis tracking-wider my-1">1800-599-0019</p>
-                      <p className="text-sm text-muted">24/7 Toll-Free (India)</p>
+                      <p className="font-display text-3xl font-bold text-crisis tracking-wider my-1">1800-599-0019</p>
+                      <p className="text-sm font-medium text-muted">24/7 Toll-Free (India)</p>
                     </div>
                   </div>
-                  <div className="h-px bg-muted/20 w-full"></div>
-                  <div className="flex items-start gap-4">
-                    <div className="bg-crisis/10 p-3 rounded-full text-crisis mt-1">
-                      <Phone className="h-5 w-5" />
+                  <div className="h-px bg-crisis/10 w-full"></div>
+                  <div className="flex items-center gap-5 p-2">
+                    <div className="bg-crisis/10 p-4 rounded-full text-crisis">
+                      <Phone className="h-6 w-6" />
                     </div>
                     <div>
                       <p className="font-semibold text-ink text-lg">AASRA Helpline</p>
-                      <p className="text-2xl font-display font-bold text-crisis tracking-wider my-1">9820466726</p>
-                      <p className="text-sm text-muted">24/7 support</p>
+                      <p className="font-display text-3xl font-bold text-crisis tracking-wider my-1">9820466726</p>
+                      <p className="text-sm font-medium text-muted">24/7 Support</p>
                     </div>
                   </div>
                 </div>
               </div>
             ) : (
-              // STANDARD RESULT PATH
-              <div className="space-y-6 rounded-2xl border border-muted/20 bg-white p-7 shadow-sm">
+              /* --- REFLECTION RESULT UI --- */
+              <div className="space-y-8 rounded-[2rem] border border-muted/10 bg-white p-8 md:p-10 shadow-xl relative overflow-hidden">
+                <div className="absolute top-0 left-0 w-full h-2 bg-gradient-to-r from-accent-calm to-accent-warm"></div>
+                
                 <div className="flex items-center justify-between">
-                  <p className="text-xs font-semibold uppercase tracking-wider text-muted">
-                    {source === "mock" ? "Demo Data" : "Analysis"}
+                  <p className="text-xs font-bold uppercase tracking-widest text-muted/70 bg-paper px-3 py-1 rounded-full">
+                    {source === "mock" ? "Demo Analysis" : "AI Reflection"}
                   </p>
                 </div>
 
-                <div className="space-y-5">
+                <div className="space-y-8">
                   <div>
-                    <h3 className="flex items-center gap-2 text-sm font-semibold text-muted mb-3 uppercase tracking-wider">
+                    <h3 className="flex items-center gap-2 text-sm font-bold text-muted mb-4 uppercase tracking-widest">
                       <Activity className="h-4 w-4" /> Detected Stressors
                     </h3>
                     <div className="flex flex-wrap gap-2">
                       {result.detected_stressors.length > 0 ? (
                         result.detected_stressors.map((stressor, idx) => (
-                          <span key={idx} className="inline-flex items-center rounded-full bg-paper px-3 py-1 text-sm font-medium text-ink border border-muted/10">
+                          <span key={idx} className="inline-flex items-center rounded-full bg-paper px-4 py-1.5 text-sm font-medium text-ink border border-muted/10 shadow-sm transition-transform hover:scale-105">
                             {stressor}
                           </span>
                         ))
@@ -196,19 +272,19 @@ export default function App() {
                   <div className="h-px bg-muted/10 w-full"></div>
 
                   <div>
-                     <h3 className="text-sm font-semibold text-muted mb-2 uppercase tracking-wider">
+                     <h3 className="text-sm font-bold text-muted mb-3 uppercase tracking-widest">
                       Emotional Tone
                     </h3>
-                    <p className="text-ink font-medium capitalize">{result.emotional_tone}</p>
+                    <p className="text-ink text-xl font-medium capitalize">{result.emotional_tone}</p>
                   </div>
 
                   <div className="h-px bg-muted/10 w-full"></div>
 
-                  <div className="bg-accent-calm/10 rounded-xl p-5 border border-accent-calm/20">
-                    <h3 className="flex items-center gap-2 font-display text-lg font-semibold text-ink mb-2">
-                      <BookOpen className="h-5 w-5 text-accent-calm" /> Grounding Strategy
+                  <div className="bg-gradient-to-br from-accent-calm/10 to-transparent rounded-2xl p-6 md:p-8 border border-accent-calm/20">
+                    <h3 className="flex items-center gap-3 font-display text-2xl font-bold text-ink mb-4">
+                      <BookOpen className="h-6 w-6 text-accent-calm" /> Grounding Strategy
                     </h3>
-                    <p className="text-ink/90 leading-relaxed">
+                    <p className="text-ink/90 text-lg leading-relaxed">
                       {result.strategy}
                     </p>
                   </div>
