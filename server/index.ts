@@ -2,6 +2,17 @@
 import express from "express";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import fs from "node:fs";
+
+try {
+  const envFile = fs.readFileSync(path.join(process.cwd(), ".env"), "utf8");
+  envFile.split('\n').forEach(line => {
+    const match = line.match(/^\s*([\w.-]+)\s*=\s*(.*)?\s*$/);
+    if (match) {
+      process.env[match[1]] = match[2];
+    }
+  });
+} catch (e) {}
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const PORT = Number(process.env.PORT) || 8081;
