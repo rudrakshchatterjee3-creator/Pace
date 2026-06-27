@@ -18,6 +18,13 @@ import {
   Coffee,
   Moon,
   Users,
+  Brain,
+  Clock3,
+  Headphones,
+  ArrowRight,
+  CheckCircle2,
+  LineChart,
+  TimerReset,
 } from "lucide-react";
 import { BarChart, Bar, ResponsiveContainer, XAxis, Tooltip, AreaChart, Area, YAxis, CartesianGrid } from "recharts";
 import { callAgent } from "./lib/geminiClient";
@@ -60,6 +67,47 @@ const CRISIS_FALLBACK: PaceOut = {
   strategy: "",
   resilience_score: 1,
 };
+
+const MUSIC_LINKS = [
+  {
+    title: "Lofi Girl radio",
+    url: "https://www.youtube.com/watch?v=jfKfPfyJRdk",
+    note: "A steady no-sign-in YouTube stream for study blocks.",
+  },
+  {
+    title: "Chillhop radio",
+    url: "https://www.youtube.com/watch?v=5yx6BWlEVcY",
+    note: "Soft beats for journaling or cooling down after a mock test.",
+  },
+  {
+    title: "Calm study playlist",
+    url: "https://www.youtube.com/results?search_query=lofi+study+music+no+ads",
+    note: "Use when you want a quieter background before sleep.",
+  },
+] as const;
+
+const LANDING_PROOF = [
+  {
+    value: "59.3M",
+    label: "U.S. adults lived with a mental illness in 2022.",
+    source: "NIMH",
+    url: "https://www.nimh.nih.gov/health/statistics/mental-illness",
+  },
+  {
+    value: "40%",
+    label: "high-school students reported persistent sadness or hopelessness in 2023.",
+    source: "CDC YRBS",
+    url: "https://www.cdc.gov/yrbs/dstr/index.html",
+  },
+  {
+    value: "301M",
+    label: "people worldwide were living with an anxiety disorder in 2019.",
+    source: "WHO",
+    url: "https://www.who.int/news-room/fact-sheets/detail/anxiety-disorders",
+  },
+] as const;
+
+const randomMusicLink = () => MUSIC_LINKS[Math.floor(Math.random() * MUSIC_LINKS.length)];
 
 function getDemoFallback(profile: UserProfile | null): PaceOut {
   const name = profile?.name || "student";
@@ -105,6 +153,48 @@ function toneColorClass(tone: string) {
   if (t.includes("anx") || t.includes("overwhelm") || t.includes("stress")) return "bg-crisis";
   if (t.includes("hope") || t.includes("calm") || t.includes("good") || t.includes("accomplish")) return "bg-accent-calm";
   return "bg-accent-warm";
+}
+
+function PaceLogo({ compact = false }: { compact?: boolean }) {
+  return (
+    <div className="inline-flex items-center gap-3 text-ink">
+      <div className="relative h-11 w-11 shrink-0 rounded-full bg-ink shadow-[0_14px_30px_rgba(45,49,66,0.18)]">
+        <div className="absolute inset-2 rounded-full border border-paper/45"></div>
+        <div className="absolute left-1/2 top-1/2 h-1.5 w-5 -translate-x-1/2 -translate-y-1/2 rounded-full bg-paper"></div>
+        <div className="absolute left-1/2 top-[9px] h-5 w-1.5 -translate-x-1/2 rounded-full bg-accent-warm"></div>
+      </div>
+      {!compact && (
+        <div className="leading-none">
+          <span className="block font-display text-2xl font-bold tracking-tight">Pace</span>
+          <span className="mt-1 block text-[10px] font-bold uppercase tracking-[0.28em] text-muted">steady study</span>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function MusicLinkCard({ compact = false }: { compact?: boolean }) {
+  const [music] = useState(randomMusicLink);
+
+  return (
+    <a
+      href={music.url}
+      target="_blank"
+      rel="noreferrer"
+      className={`group flex items-center gap-3 rounded-xl border border-muted/10 bg-white/80 p-4 shadow-sm transition-all hover:-translate-y-0.5 hover:border-accent-calm/40 hover:shadow-md ${
+        compact ? "max-w-full" : ""
+      }`}
+    >
+      <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-accent-calm/15 text-accent-calm">
+        <Headphones className="h-5 w-5" />
+      </div>
+      <div className="min-w-0 flex-1">
+        <p className="text-sm font-semibold text-ink">{music.title}</p>
+        <p className="text-xs leading-relaxed text-muted">{music.note}</p>
+      </div>
+      <ArrowRight className="h-4 w-4 shrink-0 text-muted transition-transform group-hover:translate-x-0.5 group-hover:text-ink" />
+    </a>
+  );
 }
 
 export default function App() {
@@ -190,14 +280,14 @@ export default function App() {
           task: "analyze-journal",
           input,
           schemaHint: "{ is_crisis: boolean, detected_stressors: string[], emotional_tone: string, strategy: string, resilience_score: number }",
-          system: "You are a supportive digital companion for students taking high-stakes exams. Analyze the journal entry. If the user expresses self-harm, suicidal ideation, or crisis-level distress, set is_crisis to true and resilience_score to 1. Otherwise, identify their stressors, determine their emotional tone, rate their resilience on a scale of 1 to 10 based on their coping capability and outlook in the entry, and provide ONE short, actionable grounding strategy.",
+          system: "You are Pace, a supportive digital companion for students taking high-stakes exams. Return only the requested JSON. Do not diagnose. Do not invent facts about the user. Use only the journal entry and provided profile. If the user expresses self-harm, suicidal ideation, or crisis-level distress, set is_crisis to true and resilience_score to 1. Otherwise, identify up to five stressors, name the emotional tone in plain words, rate resilience from 1 to 10 based on coping capability and outlook in the entry, and provide one short, actionable grounding strategy under 70 words.",
           profile: profile || undefined,
         },
         { mock: () => forceCrisisDemo ? CRISIS_FALLBACK : getDemoFallback(profile) }
       );
 
       const text = input.journalEntry.toLowerCase();
-      if (text.includes("want to end it") || text.includes("hurt myself")) {
+      if (text.includes("want to end it") || text.includes("hurt myself") || text.includes("kill myself") || text.includes("suicide")) {
         data.is_crisis = true;
         data.resilience_score = 1;
       }
@@ -229,32 +319,117 @@ export default function App() {
   // --- LANDING PAGE ---
   if (!user) {
     return (
-      <main className="relative flex min-h-screen flex-col items-center justify-center bg-paper px-6 font-body overflow-hidden">
-        {/* Animated Shader Background */}
-        <ShaderBackground className="absolute inset-0 -z-10 h-full w-full opacity-50" />
-        <div className="absolute inset-0 -z-10 bg-paper/40 pointer-events-none"></div>
+      <main className="landing-shell relative min-h-screen overflow-hidden bg-paper font-body text-ink">
+        <ShaderBackground className="absolute inset-0 -z-10 h-full w-full opacity-35" />
+        <div className="study-scroll-layer" aria-hidden="true">
+          <span className="study-note note-a">mock test 62%</span>
+          <span className="study-note note-b">sleep: 5h 20m</span>
+          <span className="study-note note-c">revise organic chem</span>
+          <span className="study-line line-a"></span>
+          <span className="study-line line-b"></span>
+        </div>
 
-        <div className="relative z-10 w-full max-w-md text-center space-y-12 animate-in fade-in slide-in-from-bottom-8 duration-1000">
-          <div className="space-y-6">
-            <div className="mx-auto h-24 w-24 bg-ink rounded-full flex items-center justify-center shadow-2xl ring-8 ring-ink/5">
-              <Sparkles className="h-12 w-12 text-paper" />
+        <section className="relative z-10 mx-auto flex min-h-screen w-full max-w-6xl flex-col px-6 py-8 md:px-10">
+          <header className="flex items-center justify-between">
+            <PaceLogo />
+            <a href="#start" className="hidden rounded-full border border-muted/20 bg-white/70 px-5 py-2 text-sm font-semibold text-ink shadow-sm backdrop-blur transition-all hover:-translate-y-0.5 hover:border-accent-calm/40 md:inline-flex">
+              Start gently
+            </a>
+          </header>
+
+          <div className="grid flex-1 items-center gap-10 py-14 md:grid-cols-[1.05fr_0.95fr] md:py-20">
+            <div className="space-y-8">
+              <div className="inline-flex items-center gap-2 rounded-full border border-accent-calm/25 bg-white/70 px-4 py-2 text-xs font-bold uppercase tracking-[0.2em] text-muted shadow-sm">
+                <Brain className="h-4 w-4 text-accent-calm" />
+                Built for overloaded students
+              </div>
+              <div className="space-y-5">
+                <h1 className="max-w-3xl font-display text-[clamp(3rem,9vw,6.9rem)] font-bold leading-[0.9] tracking-tight text-ink">
+                  When your mind is racing, Pace slows the next minute down.
+                </h1>
+                <p className="max-w-xl text-lg leading-8 text-ink/72 md:text-xl">
+                  Write the messy version of what happened. Pace reads for stress, pressure, and burnout, then gives you one small reset you can actually do before the next study block.
+                </p>
+              </div>
+              <div className="flex flex-wrap gap-3">
+                <span className="rounded-full bg-white/75 px-4 py-2 text-sm font-semibold text-ink shadow-sm">Mock test spirals</span>
+                <span className="rounded-full bg-white/75 px-4 py-2 text-sm font-semibold text-ink shadow-sm">Parent pressure</span>
+                <span className="rounded-full bg-white/75 px-4 py-2 text-sm font-semibold text-ink shadow-sm">Late-night panic</span>
+                <span className="rounded-full bg-white/75 px-4 py-2 text-sm font-semibold text-ink shadow-sm">Comparison loops</span>
+              </div>
             </div>
-            <div>
-              <h1 className="font-display text-5xl md:text-6xl font-bold tracking-tight text-ink mb-4">
-                Welcome to Pace
-              </h1>
-              <p className="text-xl text-ink/70 font-medium max-w-sm mx-auto leading-relaxed">
-                Your digital companion for the exam marathon.
-              </p>
+
+            <div className="landing-journal-panel scroll-reveal rounded-2xl border border-muted/10 bg-white/80 p-5 shadow-2xl backdrop-blur">
+              <div className="mb-5 flex items-center justify-between">
+                <div>
+                  <p className="text-xs font-bold uppercase tracking-[0.22em] text-muted">Tonight's entry</p>
+                  <p className="mt-1 font-display text-2xl font-bold">"I studied all day and still feel behind."</p>
+                </div>
+                <Clock3 className="h-6 w-6 text-accent-warm" />
+              </div>
+              <div className="space-y-3">
+                <div className="rounded-xl bg-paper p-4">
+                  <p className="text-sm leading-6 text-ink/75">Your brain is treating one bad mock like proof that the whole exam is slipping away.</p>
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="rounded-xl border border-accent-calm/20 bg-accent-calm/10 p-4">
+                    <p className="text-xs font-bold uppercase tracking-widest text-muted">Tone</p>
+                    <p className="mt-2 font-semibold text-ink">wired, tired</p>
+                  </div>
+                  <div className="rounded-xl border border-accent-warm/25 bg-accent-warm/10 p-4">
+                    <p className="text-xs font-bold uppercase tracking-widest text-muted">Next</p>
+                    <p className="mt-2 font-semibold text-ink">10 minute reset</p>
+                  </div>
+                </div>
+                <MusicLinkCard compact />
+              </div>
             </div>
           </div>
+        </section>
 
-          <div className="rounded-[2rem] border border-white/40 bg-white/60 p-10 shadow-xl backdrop-blur-xl transition-all hover:bg-white/70">
-            <h2 className="font-display text-2xl font-bold text-ink mb-8">Start Your Journey</h2>
-            <div className="flex justify-center">
+        <section className="relative z-10 border-y border-muted/10 bg-white/55 px-6 py-16 backdrop-blur md:px-10">
+          <div className="mx-auto grid max-w-6xl gap-5 md:grid-cols-3">
+            {LANDING_PROOF.map((item) => (
+              <a key={item.value} href={item.url} target="_blank" rel="noreferrer" className="scroll-reveal rounded-2xl border border-muted/10 bg-white p-6 shadow-sm transition-all hover:-translate-y-1 hover:border-accent-calm/35 hover:shadow-lg">
+                <p className="font-display text-5xl font-bold text-ink">{item.value}</p>
+                <p className="mt-4 min-h-16 text-sm leading-6 text-muted">{item.label}</p>
+                <p className="mt-5 text-xs font-bold uppercase tracking-[0.2em] text-accent-calm">{item.source}</p>
+              </a>
+            ))}
+          </div>
+        </section>
+
+        <section className="relative z-10 mx-auto grid max-w-6xl gap-6 px-6 py-16 md:grid-cols-[0.9fr_1.1fr] md:px-10 md:py-24">
+          <div className="scroll-reveal space-y-4">
+            <p className="text-xs font-bold uppercase tracking-[0.24em] text-accent-calm">What Pace notices</p>
+            <h2 className="font-display text-4xl font-bold leading-tight md:text-5xl">The problem is rarely discipline. It is an unprocessed day.</h2>
+          </div>
+          <div className="grid gap-4">
+            {[
+              ["You compare your chapter count to everyone else's and call it motivation."],
+              ["You keep studying because stopping feels unsafe, even when nothing is going in."],
+              ["You know you need a break, but you need someone to tell you what kind."],
+              ["You want support that sounds like a person, not a poster on a classroom wall."],
+            ].map(([text]) => (
+              <div key={text} className="scroll-reveal flex gap-4 rounded-2xl border border-muted/10 bg-white/75 p-5 shadow-sm">
+                <CheckCircle2 className="mt-1 h-5 w-5 shrink-0 text-accent-calm" />
+                <p className="text-base leading-7 text-ink/78">{text}</p>
+              </div>
+            ))}
+          </div>
+        </section>
+
+        <section id="start" className="relative z-10 mx-auto max-w-xl px-6 pb-24 text-center md:px-10">
+          <div className="scroll-reveal rounded-2xl border border-muted/10 bg-white/85 p-8 shadow-2xl backdrop-blur md:p-10">
+            <PaceLogo />
+            <h2 className="mt-8 font-display text-3xl font-bold text-ink">Start with one honest entry.</h2>
+            <p className="mx-auto mt-3 max-w-sm text-sm leading-6 text-muted">
+              Pace stores your reflections on this device and turns each entry into a clear next step.
+            </p>
+            <div className="mt-8 flex justify-center">
               <GoogleLogin
                 onSuccess={handleLoginSuccess}
-                onError={() => console.warn('Google Login Failed')}
+                onError={() => console.warn("Google Login Failed")}
                 useOneTap
                 theme="filled_black"
                 shape="pill"
@@ -262,11 +437,8 @@ export default function App() {
                 text="continue_with"
               />
             </div>
-            <p className="text-sm text-muted mt-8 font-medium">
-              Pace is a safe space. Your entries are processed securely and never shared.
-            </p>
           </div>
-        </div>
+        </section>
       </main>
     );
   }
@@ -299,7 +471,14 @@ export default function App() {
 
       {/* TopAppBar */}
       <header className="sticky top-0 z-40 flex items-center justify-between border-b border-muted/10 bg-paper/80 px-6 py-4 backdrop-blur-md md:px-10">
-        <div className="font-display text-2xl font-bold text-ink">Pace</div>
+        <button
+          type="button"
+          onClick={() => setView("journal")}
+          aria-label="Go to dashboard"
+          className="rounded-full transition-transform hover:-translate-y-0.5"
+        >
+          <PaceLogo />
+        </button>
         <nav className="hidden md:flex items-center gap-8">
           <NavTab icon={NotebookPen} label="Journal" active={view === "journal"} onClick={() => setView("journal")} />
           <NavTab icon={TrendingUp} label="Trends" active={view === "trends"} onClick={() => setView("trends")} />
@@ -325,7 +504,7 @@ export default function App() {
         </div>
       </header>
 
-      <main className="relative z-10 mx-auto flex min-h-[calc(100vh-72px)] max-w-2xl flex-col px-6 py-8 pb-28 md:py-12 md:pb-12">
+      <main className="relative z-10 mx-auto flex min-h-[calc(100vh-72px)] max-w-4xl flex-col px-6 py-8 pb-28 md:py-12 md:pb-12">
         {view === "journal" && (
           <JournalView
             user={user}
@@ -537,6 +716,8 @@ function JournalView({
           />
         </div>
 
+        <MusicLinkCard />
+
         {loading ? (
           <LoadingDots label="Reflecting on your entry..." />
         ) : (
@@ -552,19 +733,6 @@ function JournalView({
             >
               <Sparkles className="h-5 w-5" />
               Reflect
-            </button>
-            <div className="flex-1"></div>
-            <button
-              onClick={() => run({ journalEntry: entry || "sample", template: selectedTemplate || undefined })}
-              className="rounded-xl border border-muted/20 bg-white px-5 py-3 font-medium text-muted transition-all hover:bg-paper hover:text-ink hover:border-muted/40"
-            >
-              Load Demo
-            </button>
-            <button
-              onClick={() => run({ journalEntry: "I can't take this anymore, I want to end it" }, true)}
-              className="rounded-xl border border-red-200 bg-red-50 px-5 py-3 font-medium text-red-700 transition-all hover:bg-red-100 hover:border-red-300"
-            >
-              Test Crisis
             </button>
           </div>
         )}
@@ -629,7 +797,7 @@ function JournalView({
 
                 <div className="flex items-center justify-between">
                   <p className="text-xs font-bold uppercase tracking-widest text-muted/70 bg-paper px-3 py-1 rounded-full">
-                    {source === "mock" ? "Demo Analysis" : "AI Reflection"}
+                    {source === "mock" ? "Guided reflection" : "AI reflection"}
                   </p>
                 </div>
 
@@ -692,6 +860,8 @@ function JournalView({
                   </div>
                 </div>
 
+                <MusicLinkCard />
+
                 <button
                   onClick={startNewEntry}
                   className="rounded-xl border border-muted/20 bg-white px-5 py-3 font-medium text-muted transition-all hover:bg-paper hover:text-ink hover:border-muted/40"
@@ -730,6 +900,19 @@ function TrendsView({
         snippet: record.journalEntry.length > 35 ? `${record.journalEntry.slice(0, 35)}...` : record.journalEntry
       };
     });
+  const averageResilience = history.length
+    ? Math.round(history.reduce((sum, record) => sum + (record.result.resilience_score ?? 6), 0) / history.length)
+    : 0;
+  const stressorCounts = history.reduce<Record<string, number>>((acc, record) => {
+    record.result.detected_stressors.forEach((stressor) => {
+      const key = stressor.trim().toLowerCase();
+      if (key) acc[key] = (acc[key] || 0) + 1;
+    });
+    return acc;
+  }, {});
+  const topStressors = Object.entries(stressorCounts)
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 4);
 
   const CustomTooltip = ({ active, payload }: { active?: boolean; payload?: { payload: { date: string; time: string; score: number; snippet: string } }[] }) => {
     if (active && payload && payload.length) {
@@ -773,13 +956,28 @@ function TrendsView({
             <BookOpen className="h-6 w-6 text-accent-calm" />
           </div>
         </div>
+        <div className="rounded-2xl border border-muted/10 bg-white p-6 shadow-sm flex items-center justify-between sm:col-span-2">
+          <div>
+            <p className="font-display text-4xl font-bold text-ink leading-none">{averageResilience || "Start"}</p>
+            <p className="text-sm text-muted mt-1 font-medium">
+              {averageResilience ? "Average resilience rating" : "One entry turns this into your pattern map"}
+            </p>
+          </div>
+          <div className="h-12 w-12 rounded-full bg-accent-calm/15 flex items-center justify-center">
+            <LineChart className="h-6 w-6 text-accent-calm" />
+          </div>
+        </div>
       </div>
 
       <div className="rounded-2xl border border-muted/10 bg-white p-6 shadow-sm relative">
         <p className="text-sm font-bold uppercase tracking-widest text-muted mb-4">Resilience Trend</p>
         {resilienceData.length === 0 ? (
-          <div className="h-48 flex items-center justify-center text-muted/70 italic text-sm">
-            Log reflections to see your trend over time.
+          <div className="grid min-h-48 place-items-center rounded-xl bg-paper/70 p-6 text-center">
+            <div>
+              <TimerReset className="mx-auto mb-3 h-8 w-8 text-accent-calm" />
+              <p className="font-semibold text-ink">Your first trend starts with one honest check-in.</p>
+              <p className="mx-auto mt-2 max-w-sm text-sm leading-6 text-muted">After each reflection, Pace plots whether your stress is cooling, holding, or building.</p>
+            </div>
           </div>
         ) : (
           <div className="h-64 w-full">
@@ -816,6 +1014,28 @@ function TrendsView({
                 />
               </AreaChart>
             </ResponsiveContainer>
+          </div>
+        )}
+      </div>
+
+      <div className="rounded-2xl border border-muted/10 bg-white p-6 shadow-sm">
+        <p className="text-sm font-bold uppercase tracking-widest text-muted mb-4">Pressure map</p>
+        {topStressors.length === 0 ? (
+          <div className="grid gap-3 sm:grid-cols-2">
+            {["Mock scores", "Unfinished syllabus", "Family expectations", "Sleep debt"].map((label) => (
+              <div key={label} className="rounded-xl border border-dashed border-muted/20 bg-paper/60 p-4">
+                <p className="text-sm font-semibold text-ink">{label}</p>
+                <p className="mt-1 text-xs leading-5 text-muted">Pace will replace this with your own recurring stressors.</p>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div className="flex flex-wrap gap-2">
+            {topStressors.map(([stressor, count]) => (
+              <span key={stressor} className="rounded-full border border-accent-calm/20 bg-accent-calm/10 px-4 py-2 text-sm font-semibold capitalize text-ink">
+                {stressor} <span className="text-muted">x{count}</span>
+              </span>
+            ))}
           </div>
         )}
       </div>
@@ -905,6 +1125,11 @@ function ResourcesView() {
         <TipCard icon={Moon} title="Protect your sleep" body="Cramming past midnight rarely beats a rested brain. Set a wind-down alarm." />
         <TipCard icon={Users} title="Talk to someone" body="A friend, parent, or teacher can carry some of the weight. You don't have to do this solo." />
         <TipCard icon={Activity} title="Move your body" body="Even a five minute walk resets a racing mind better than another revision pass." />
+      </div>
+
+      <div className="space-y-3">
+        <p className="text-sm font-bold uppercase tracking-widest text-muted">Low-pressure background sound</p>
+        <MusicLinkCard />
       </div>
 
       <div className="rounded-2xl border border-crisis/20 bg-crisis/5 p-6 md:p-8">
@@ -1202,8 +1427,8 @@ function OnboardingView({ user, onSave }: { user: GoogleUser; onSave: (profile: 
 
       <div className="relative z-10 w-full max-w-md space-y-8 animate-in fade-in slide-in-from-bottom-8 duration-700">
         <div className="text-center space-y-4">
-          <div className="mx-auto h-16 w-16 bg-ink rounded-full flex items-center justify-center shadow-lg">
-            <Sparkles className="h-8 w-8 text-paper" />
+          <div className="flex justify-center">
+            <PaceLogo />
           </div>
           <div>
             <h1 className="font-display text-3xl font-bold tracking-tight text-ink">Set up your profile</h1>

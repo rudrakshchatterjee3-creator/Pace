@@ -37,6 +37,34 @@ export interface AgentResult<TOut> {
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
+function normalizeAgentData<TOut>(task: string, value: unknown): TOut {
+  if (task !== "analyze-journal") return value as TOut;
+  if (!value || typeof value !== "object") {
+    throw new Error("Model returned an unreadable reflection.");
+  }
+
+  const data = value as Record<string, unknown>;
+  const isCrisis = data.is_crisis === true;
+  const rawStressors = Array.isArray(data.detected_stressors) ? data.detected_stressors : [];
+  const score = Number(data.resilience_score);
+
+  return {
+    is_crisis: isCrisis,
+    detected_stressors: rawStressors
+      .filter((item): item is string => typeof item === "string")
+      .map((item) => item.trim())
+      .filter(Boolean)
+      .slice(0, 5),
+    emotional_tone: typeof data.emotional_tone === "string" && data.emotional_tone.trim()
+      ? data.emotional_tone.trim().slice(0, 80)
+      : isCrisis ? "overwhelmed" : "steadying",
+    strategy: typeof data.strategy === "string" && data.strategy.trim()
+      ? data.strategy.trim().slice(0, 420)
+      : "Take one minute to breathe slowly, drink water, and name the next small study step.",
+    resilience_score: isCrisis ? 1 : Number.isFinite(score) ? Math.min(10, Math.max(1, Math.round(score))) : 6,
+  } as TOut;
+}
+
 /**
  * Call the agent proxy and get back typed, structured data.
  *
@@ -84,7 +112,8 @@ export async function callAgent<TIn, TOut>(
       if (json.error) throw new Error(json.error);
 
       // Server already validated/parsed JSON, but guard anyway.
-      const data = (typeof json.data === "string" ? JSON.parse(json.data) : json.data) as TOut;
+      const parsedData = typeof json.data === "string" ? JSON.parse(json.data) : json.data;
+      const data = normalizeAgentData<TOut>(req.task, parsedData);
       return { data, source: "live", ms: Math.round(performance.now() - started) };
     } catch (err) {
       const isLast = attempt === retries;

@@ -42,6 +42,33 @@ function getExamDescription(exam: string): string {
   return descriptions[exam] || "academic exam preparation.";
 }
 
+function normalizeReflection(value: unknown) {
+  if (!value || typeof value !== "object") {
+    throw new Error("Model returned invalid JSON shape");
+  }
+
+  const data = value as Record<string, unknown>;
+  const isCrisis = data.is_crisis === true;
+  const rawScore = Number(data.resilience_score);
+  const rawStressors = Array.isArray(data.detected_stressors) ? data.detected_stressors : [];
+
+  return {
+    is_crisis: isCrisis,
+    detected_stressors: rawStressors
+      .filter((item): item is string => typeof item === "string")
+      .map((item) => item.trim())
+      .filter(Boolean)
+      .slice(0, 5),
+    emotional_tone: typeof data.emotional_tone === "string" && data.emotional_tone.trim()
+      ? data.emotional_tone.trim().slice(0, 80)
+      : isCrisis ? "overwhelmed" : "steadying",
+    strategy: typeof data.strategy === "string" && data.strategy.trim()
+      ? data.strategy.trim().slice(0, 420)
+      : "Take one minute to breathe slowly, drink water, and name the next small study step.",
+    resilience_score: isCrisis ? 1 : Number.isFinite(rawScore) ? Math.min(10, Math.max(1, Math.round(rawScore))) : 6,
+  };
+}
+
 app.post("/api/agent", async (req, res) => {
   if (!apiKey) return res.status(503).json({ error: "Model unavailable: NVIDIA_API_KEY missing" });
 
@@ -71,6 +98,7 @@ app.post("/api/agent", async (req, res) => {
       systemInstruction += " Instruct the model to rate the user's resilience from 1 to 10 based on their coping capability and outlook in the entry, and return this as resilience_score in the JSON.";
     }
     systemInstruction += " If is_crisis is set to true due to distress/self-harm/suicidal ideation, set resilience_score to 1.";
+    systemInstruction += " Do not diagnose. Do not invent events, symptoms, or facts not present in the entry or profile. Keep strategy under 70 words and make it concrete enough to do immediately.";
   }
 
   if (profile) {
@@ -117,13 +145,9 @@ app.post("/api/agent", async (req, res) => {
     let text = json.choices[0]?.message?.content ?? "";
     text = text.replace(/^```json\s*/i, '').replace(/```\s*$/i, '').trim();
 
-    const data = JSON.parse(text);
-    if (task === "analyze-journal" && data) {
-      if (typeof data.resilience_score !== "undefined") {
-        data.resilience_score = Number(data.resilience_score);
-      } else {
-        data.resilience_score = data.is_crisis ? 1 : 6;
-      }
+    let data = JSON.parse(text);
+    if (task === "analyze-journal") {
+      data = normalizeReflection(data);
     }
     return res.json({ data });
   } catch (err) {

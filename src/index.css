@@ -39,8 +39,138 @@ body {
   font-family: var(--font-body);
 }
 
+.landing-shell {
+  background:
+    linear-gradient(180deg, rgba(247, 245, 240, 0.82), rgba(247, 245, 240, 0.96)),
+    radial-gradient(circle at 18% 18%, rgba(220, 174, 150, 0.18), transparent 28%),
+    radial-gradient(circle at 84% 8%, rgba(140, 165, 165, 0.2), transparent 24%);
+}
+
+.study-scroll-layer {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+  overflow: hidden;
+}
+
+.study-note {
+  position: absolute;
+  display: inline-flex;
+  border: 1px solid rgb(var(--color-muted) / 0.18);
+  background: rgb(255 255 255 / 0.58);
+  color: rgb(var(--color-ink) / 0.52);
+  box-shadow: 0 18px 50px rgb(45 49 66 / 0.08);
+  border-radius: 14px;
+  padding: 0.7rem 0.95rem;
+  font-size: 0.78rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  backdrop-filter: blur(12px);
+  animation: study-drift linear both;
+  animation-timeline: scroll(root);
+}
+
+.note-a {
+  left: 5%;
+  top: 22%;
+  rotate: -7deg;
+  animation-range: 0 70vh;
+}
+
+.note-b {
+  right: 7%;
+  top: 34%;
+  rotate: 5deg;
+  animation-range: 10vh 95vh;
+}
+
+.note-c {
+  left: 10%;
+  bottom: 12%;
+  rotate: 4deg;
+  animation-range: 20vh 110vh;
+}
+
+.study-line {
+  position: absolute;
+  height: 1px;
+  width: min(28rem, 52vw);
+  background: linear-gradient(90deg, transparent, rgb(var(--color-accent-calm) / 0.32), transparent);
+  animation: line-drift linear both;
+  animation-timeline: scroll(root);
+}
+
+.line-a {
+  right: -4rem;
+  top: 18%;
+  rotate: -14deg;
+}
+
+.line-b {
+  left: -3rem;
+  top: 66%;
+  rotate: 12deg;
+}
+
+.scroll-reveal {
+  animation: reveal-up 0.8s ease both;
+  animation-timeline: view();
+  animation-range: entry 0% cover 28%;
+}
+
+@keyframes study-drift {
+  from {
+    transform: translate3d(0, 0, 0);
+    opacity: 0.9;
+  }
+  to {
+    transform: translate3d(0, -90px, 0);
+    opacity: 0.25;
+  }
+}
+
+@keyframes line-drift {
+  from {
+    transform: translateX(0);
+    opacity: 0.75;
+  }
+  to {
+    transform: translateX(-80px);
+    opacity: 0.25;
+  }
+}
+
+@keyframes reveal-up {
+  from {
+    opacity: 0;
+    transform: translateY(26px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@supports not (animation-timeline: view()) {
+  .scroll-reveal,
+  .study-note,
+  .study-line {
+    animation: none;
+  }
+}
+
 /* Visible focus rings everywhere, per DESIGN.md §9. Never remove this. */
 :focus-visible {
   outline: 2px solid rgb(var(--color-accent-calm));
   outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .scroll-reveal,
+  .study-note,
+  .study-line {
+    animation: none !important;
+  }
 }
