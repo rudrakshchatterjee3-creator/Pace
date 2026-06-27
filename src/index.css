@@ -1,0 +1,45 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/*
+  DESIGN.md §3: this is the token system. Replace the placeholder values
+  below with the 4-6 NAMED hex colors and the real type pairing chosen in
+  P1, derived from the challenge's subject. Do not ship the placeholders.
+*/
+:root {
+  --color-ink: #2D3142;
+  --color-paper: #F7F5F0;
+  --color-accent-calm: #8CA5A5;
+  --color-accent-warm: #DCAE96;
+  --color-crisis: #E28743;
+  --color-muted: #8E98A8;
+
+  --font-display: "Outfit", sans-serif;
+  --font-body: "Inter", sans-serif;
+  --font-mono: ui-monospace, monospace;
+
+  --radius: 12px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+  }
+}
+
+body {
+  background-color: var(--color-paper);
+  color: var(--color-ink);
+  font-family: var(--font-body);
+}
+
+/* Visible focus rings everywhere, per DESIGN.md §9. Never remove this. */
+:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
+}
